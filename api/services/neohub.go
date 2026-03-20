@@ -37,7 +37,7 @@ func (s *NeoHubService) SendMessage(to, body string) error {
 			Body: body,
 		},
 	}
-	
+
 	return s.SendStructuredMessage(&msg)
 }
 

@@ -177,9 +177,35 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 	log.Printf("Message type: %s", message.Type)
 	log.Printf("Message timestamp: %s", message.Timestamp)
 
-	if message.Type == "text" && message.Text != nil {
-		text = message.Text.Body
-	} else {
+	// Extract text based on message type
+	switch message.Type {
+	case "text":
+		if message.Text != nil {
+			text = message.Text.Body
+			log.Printf("💬 TEXT MESSAGE: '%s'", text)
+		}
+	
+	case "interactive":
+		// User clicked on button or selected from list
+		if message.Interactive != nil {
+			if message.Interactive.Type == "button_reply" && message.Interactive.ButtonReply != nil {
+				text = message.Interactive.ButtonReply.Title
+				log.Printf("🔘 BUTTON CLICKED: '%s' (ID: %s)", text, message.Interactive.ButtonReply.ID)
+			} else if message.Interactive.Type == "list_reply" && message.Interactive.ListReply != nil {
+				text = message.Interactive.ListReply.Title
+				log.Printf("📋 LIST ITEM SELECTED: '%s' (ID: %s)", text, message.Interactive.ListReply.ID)
+			}
+		}
+	
+	case "button":
+		// Legacy button format (deprecated but still possible)
+		if message.Button != nil {
+			text = message.Button.Text
+			log.Printf("🔘 LEGACY BUTTON CLICKED: '%s'", text)
+		}
+	
+	default:
+		log.Printf("⚠️  Unsupported message type: %s", message.Type)
 		return "", "", fmt.Errorf("message type not supported: %s", message.Type)
 	}
 
@@ -187,7 +213,6 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 		return "", "", fmt.Errorf("empty message text")
 	}
 
-	log.Printf("💬 MENSAGEM RECEBIDA: '%s'", text)
 	log.Printf("=== Extraction complete ===")
 
 	return text, clientID, nil
@@ -203,10 +228,10 @@ func (s *MetaService) buildMessageFromWatson(resp *models.WatsonMessageResponse,
 	// First pass: find text and option responses
 	for i := range resp.Output.Generic {
 		g := &resp.Output.Generic[i]
-		
+
 		if g.ResponseType == "text" && g.Text != "" {
 			textResponse = g.Text
-			
+
 			// Check for [[CONTINUE]] tag in text
 			if strings.HasSuffix(strings.TrimSpace(g.Text), "[[CONTINUE]]") {
 				shouldContinue = true
@@ -232,7 +257,7 @@ func (s *MetaService) buildMessageFromWatson(resp *models.WatsonMessageResponse,
 	// If there are options, create interactive message
 	if optionResponse != nil && len(optionResponse.Options) > 0 {
 		log.Printf("🔘 Found %d options from Watson", len(optionResponse.Options))
-		
+
 		// Use button type for <= 3 options, list for more
 		if len(optionResponse.Options) <= 3 {
 			msg.Type = "interactive"
@@ -255,12 +280,12 @@ func (s *MetaService) buildMessageFromWatson(resp *models.WatsonMessageResponse,
 // buildButtonMessage creates a button-type interactive message (max 3 buttons)
 func (s *MetaService) buildButtonMessage(bodyText string, optionResp *models.WatsonGeneric) *models.InteractiveMessage {
 	buttons := make([]models.InteractiveButton, 0, len(optionResp.Options))
-	
+
 	for i, opt := range optionResp.Options {
 		if i >= 3 {
 			break // WhatsApp allows max 3 buttons
 		}
-		
+
 		buttons = append(buttons, models.InteractiveButton{
 			Type: "reply",
 			Reply: models.InteractiveButtonReply{
@@ -269,12 +294,12 @@ func (s *MetaService) buildButtonMessage(bodyText string, optionResp *models.Wat
 			},
 		})
 	}
-	
+
 	header := optionResp.Title
 	if header == "" {
 		header = "Escolha uma opção"
 	}
-	
+
 	return &models.InteractiveMessage{
 		Type: "button",
 		Body: models.InteractiveBody{
@@ -289,26 +314,26 @@ func (s *MetaService) buildButtonMessage(bodyText string, optionResp *models.Wat
 // buildListMessage creates a list-type interactive message (4-10 options)
 func (s *MetaService) buildListMessage(bodyText string, optionResp *models.WatsonGeneric) *models.InteractiveMessage {
 	rows := make([]models.InteractiveRow, 0, len(optionResp.Options))
-	
+
 	for i, opt := range optionResp.Options {
 		if i >= 10 {
 			break // WhatsApp allows max 10 list items
 		}
-		
+
 		rows = append(rows, models.InteractiveRow{
 			ID:          fmt.Sprintf("opt_%d", i),
-			Title:       truncateText(opt.Label, 24), // WhatsApp row title max 24 chars
+			Title:       truncateText(opt.Label, 24),              // WhatsApp row title max 24 chars
 			Description: truncateText(optionResp.Description, 72), // Max 72 chars
 		})
 	}
-	
+
 	header := optionResp.Title
 	if header == "" {
 		header = "Escolha uma opção"
 	}
-	
+
 	buttonText := "Ver opções"
-	
+
 	return &models.InteractiveMessage{
 		Type: "list",
 		Header: &models.InteractiveHeader{

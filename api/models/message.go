@@ -12,12 +12,12 @@ type IncomingMessage struct {
 
 // OutgoingMessage represents a message to be sent via NeoHub
 type OutgoingMessage struct {
-	MessagingProduct string               `json:"messaging_product"`
-	RecipientType    string               `json:"recipient_type"`
-	To               string               `json:"to"`
-	Type             string               `json:"type"`
-	Text             *MessageText         `json:"text,omitempty"`
-	Interactive      *InteractiveMessage  `json:"interactive,omitempty"`
+	MessagingProduct string              `json:"messaging_product"`
+	RecipientType    string              `json:"recipient_type"`
+	To               string              `json:"to"`
+	Type             string              `json:"type"`
+	Text             *MessageText        `json:"text,omitempty"`
+	Interactive      *InteractiveMessage `json:"interactive,omitempty"`
 }
 
 // MessageText represents the text content of a WhatsApp message
@@ -27,11 +27,11 @@ type MessageText struct {
 
 // InteractiveMessage represents an interactive message (buttons or list)
 type InteractiveMessage struct {
-	Type   string          `json:"type"` // "button" or "list"
+	Type   string             `json:"type"` // "button" or "list"
 	Header *InteractiveHeader `json:"header,omitempty"`
-	Body   InteractiveBody `json:"body"`
+	Body   InteractiveBody    `json:"body"`
 	Footer *InteractiveFooter `json:"footer,omitempty"`
-	Action InteractiveAction `json:"action"`
+	Action InteractiveAction  `json:"action"`
 }
 
 type InteractiveHeader struct {
@@ -54,7 +54,7 @@ type InteractiveAction struct {
 }
 
 type InteractiveButton struct {
-	Type  string               `json:"type"`  // "reply"
+	Type  string                 `json:"type"` // "reply"
 	Reply InteractiveButtonReply `json:"reply"`
 }
 
@@ -64,8 +64,8 @@ type InteractiveButtonReply struct {
 }
 
 type InteractiveSection struct {
-	Title string              `json:"title,omitempty"`
-	Rows  []InteractiveRow    `json:"rows"`
+	Title string           `json:"title,omitempty"`
+	Rows  []InteractiveRow `json:"rows"`
 }
 
 type InteractiveRow struct {
@@ -116,8 +116,8 @@ type WatsonGeneric struct {
 }
 
 type WatsonOption struct {
-	Label string               `json:"label"`
-	Value WatsonOptionValue    `json:"value"`
+	Label string            `json:"label"`
+	Value WatsonOptionValue `json:"value"`
 }
 
 type WatsonOptionValue struct {
@@ -235,13 +235,39 @@ type MetaProfile struct {
 }
 
 type MetaMessage struct {
-	From      string        `json:"from"`
-	ID        string        `json:"id"`
-	Timestamp string        `json:"timestamp"`
-	Type      string        `json:"type"`
-	Text      *MetaTextBody `json:"text,omitempty"`
+	From        string                  `json:"from"`
+	ID          string                  `json:"id"`
+	Timestamp   string                  `json:"timestamp"`
+	Type        string                  `json:"type"`
+	Text        *MetaTextBody           `json:"text,omitempty"`
+	Interactive *MetaInteractiveReply   `json:"interactive,omitempty"`
+	Button      *MetaButtonReply        `json:"button,omitempty"`
 }
 
 type MetaTextBody struct {
 	Body string `json:"body"`
+}
+
+// MetaInteractiveReply represents when user selects from list or clicks button
+type MetaInteractiveReply struct {
+	Type        string               `json:"type"` // "button_reply" or "list_reply"
+	ButtonReply *MetaButtonReplyData `json:"button_reply,omitempty"`
+	ListReply   *MetaListReplyData   `json:"list_reply,omitempty"`
+}
+
+type MetaButtonReplyData struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+type MetaListReplyData struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+}
+
+// MetaButtonReply represents legacy button click (deprecated but still possible)
+type MetaButtonReply struct {
+	Payload string `json:"payload"`
+	Text    string `json:"text"`
 }
