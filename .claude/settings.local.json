@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go version:*)",
+      "Bash(go get:*)",
+      "Bash(go build:*)",
+      "Bash(go install:*)",
+      "Bash(swag init:*)"
+    ]
+  }
+}

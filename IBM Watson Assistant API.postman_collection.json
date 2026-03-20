@@ -1,0 +1,233 @@
+{
+  "info": {
+    "_postman_id": "8713cb3f-ff7e-4d20-b921-fc812cc7f82c",
+    "name": "IBM Watson Assistant API",
+    "description": "Collection básica para integração com Watson Assistant",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "8471914",
+    "_collection_link": "https://go.postman.co/collection/8471914-8713cb3f-ff7e-4d20-b921-fc812cc7f82c?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Criar Sessão",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v2/assistants/{{assistant_id}}/sessions?version={{version}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v2",
+            "assistants",
+            "{{assistant_id}}",
+            "sessions"
+          ],
+          "query": [
+            {
+              "key": "version",
+              "value": "{{version}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Enviar Mensagem",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"input\": {\n    \"message_type\": \"text\",\n    \"text\": \"Olá\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v2/assistants/{{assistant_id}}/sessions/{{session_id}}/message?version={{version}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v2",
+            "assistants",
+            "{{assistant_id}}",
+            "sessions",
+            "{{session_id}}",
+            "message"
+          ],
+          "query": [
+            {
+              "key": "version",
+              "value": "{{version}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Enviar Mensagem com Contexto",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"input\": {\n    \"message_type\": \"text\",\n    \"text\": \"continuar\"\n  },\n  \"context\": {\n    \"skills\": {\n      \"main skill\": {\n        \"user_defined\": {\n          \"assunto\": \"boleto\",\n          \"etapa\": \"pedindo_cpf\"\n        }\n      }\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/v2/assistants/{{assistant_id}}/sessions/{{session_id}}/message?version={{version}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v2",
+            "assistants",
+            "{{assistant_id}}",
+            "sessions",
+            "{{session_id}}",
+            "message"
+          ],
+          "query": [
+            {
+              "key": "version",
+              "value": "{{version}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Deletar Sessão",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v2/assistants/{{assistant_id}}/sessions/{{session_id}}?version={{version}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v2",
+            "assistants",
+            "{{assistant_id}}",
+            "sessions",
+            "{{session_id}}"
+          ],
+          "query": [
+            {
+              "key": "version",
+              "value": "{{version}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Gerar Token",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "urn:ibm:params:oauth:grant-type:apikey",
+              "type": "text",
+              "uuid": "9f002b46-5204-446b-94df-0c9aca91bdc9"
+            },
+            {
+              "key": "apikey",
+              "value": "s7rLQkAcaRtLo9R_R8A6QUKcw5DY6k1xteLCIPnFU4y9",
+              "type": "text",
+              "uuid": "fd041dfd-fb2f-46c5-9448-bbd18cf6d13f"
+            }
+          ]
+        },
+        "url": {
+          "raw": "https://iam.cloud.ibm.com/identity/token",
+          "protocol": "https",
+          "host": [
+            "iam",
+            "cloud",
+            "ibm",
+            "com"
+          ],
+          "path": [
+            "identity",
+            "token"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "eyJraWQiOiIyMDE5MDcyNCIsImFsZyI6IlJTMjU2In0.eyJpYW1faWQiOiJpYW0tU2VydmljZUlkLTJiNzBiMjAwLWFlNzYtNDk1MC1hNDdjLTM2NzAzNzBmZWM3MSIsImlkIjoiaWFtLVNlcnZpY2VJZC0yYjcwYjIwMC1hZTc2LTQ5NTAtYTQ3Yy0zNjcwMzcwZmVjNzEiLCJyZWFsbWlkIjoiaWFtIiwianRpIjoiYWY3YTU4ODMtOTM5Mi00MTNmLTkyNTMtZGUxM2ZiMGM4ODhmIiwiaWRlbnRpZmllciI6IlNlcnZpY2VJZC0yYjcwYjIwMC1hZTc2LTQ5NTAtYTQ3Yy0zNjcwMzcwZmVjNzEiLCJuYW1lIjoiQXV0by1nZW5lcmF0ZWQgc2VydmljZSBjcmVkZW50aWFscyIsInN1YiI6IlNlcnZpY2VJZC0yYjcwYjIwMC1hZTc2LTQ5NTAtYTQ3Yy0zNjcwMzcwZmVjNzEiLCJ1bmlxdWVfaW5zdGFuY2VfY3JucyI6WyJjcm46djE6Ymx1ZW1peDpwdWJsaWM6Y29udmVyc2F0aW9uOnVzLXNvdXRoOmEvZTk5MmUxNDY4NGU2NDBkODhkMzNlNjQ5YWQyOTlmMDc6MjY0ODdhYTgtZjA5ZC00MWI5LWFmNDEtM2Q2Y2M4M2FiYjc0OjoiXSwic3ViX3R5cGUiOiJTZXJ2aWNlSWQiLCJhdXRobiI6eyJzdWIiOiJTZXJ2aWNlSWQtMmI3MGIyMDAtYWU3Ni00OTUwLWE0N2MtMzY3MDM3MGZlYzcxIiwiaWFtX2lkIjoiaWFtLVNlcnZpY2VJZC0yYjcwYjIwMC1hZTc2LTQ5NTAtYTQ3Yy0zNjcwMzcwZmVjNzEiLCJzdWJfdHlwZSI6IlNlcnZpY2VJZCIsIm5hbWUiOiJBdXRvLWdlbmVyYXRlZCBzZXJ2aWNlIGNyZWRlbnRpYWxzIn0sImFwaWtleV91dWlkIjoiQXBpS2V5LWIyZjY2NzJhLTkxYjYtNDAyNy1iY2M4LWI4MmUzMmZjY2IyMyIsImFjY291bnQiOnsidmFsaWQiOnRydWUsImJzcyI6ImU5OTJlMTQ2ODRlNjQwZDg4ZDMzZTY0OWFkMjk5ZjA3IiwiZnJvemVuIjp0cnVlfSwiaWF0IjoxNzczODYzOTE3LCJleHAiOjE3NzM4Njc1MTcsImlzcyI6Imh0dHBzOi8vaWFtLmNsb3VkLmlibS5jb20vaWRlbnRpdHkiLCJncmFudF90eXBlIjoidXJuOmlibTpwYXJhbXM6b2F1dGg6Z3JhbnQtdHlwZTphcGlrZXkiLCJzY29wZSI6ImlibSBvcGVuaWQiLCJjbGllbnRfaWQiOiJkZWZhdWx0IiwiYWNyIjoxLCJhbXIiOlsicHdkIl19.kn9VZuaWnGLC-KwvNMor2wgFQFtD0RRy9RY5Go_MoJaTakLhC8j2ecdmEhw_dsg2X3QBX4oh-099qqO8GWjGYyWK7_1ullDAnvWAgORVRI48XHU1tL4MvVr9wG2duNrkJcGaOaZmdxp4kwlAnvkP9eEuEKIS0C1BB3wVq6khpeoyCWA69Y_6JwFCwY1e5vrB6RN2VjAYaYJU2kuiSTU6v6wQajk4gO31DXOjjmDoozH5rGt7A6MUsbPzo48IqgNDuKK1gObsTxDQqt50oRT9iqJmPvQc34Jq0vL1b7YWm1RI0lah2k4WcoyGZlJO-bgW9ZyFcPBJuZMdGU03OoUM3g",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.us-south.assistant.watson.cloud.ibm.com"
+    },
+    {
+      "key": "assistant_id",
+      "value": "SEU_ASSISTANT_ID"
+    },
+    {
+      "key": "session_id",
+      "value": ""
+    },
+    {
+      "key": "version",
+      "value": "2021-11-27"
+    }
+  ]
+}

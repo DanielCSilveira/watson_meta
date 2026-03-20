@@ -1,0 +1,284 @@
+basePath: /
+definitions:
+  models.APIResponse:
+    properties:
+      message:
+        example: message sent
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+  models.CreateSessionResponse:
+    properties:
+      session_id:
+        example: abc123
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+  models.DirectWatsonXRequest:
+    properties:
+      session_id:
+        example: ""
+        type: string
+      text:
+        example: Olá, preciso de ajuda
+        type: string
+      user_id:
+        example: user123
+        type: string
+    type: object
+  models.DirectWhatsAppRequest:
+    properties:
+      body:
+        example: Olá, esta é uma mensagem de teste
+        type: string
+      to:
+        example: "5511999999999"
+        type: string
+    type: object
+  models.MetaChange:
+    properties:
+      field:
+        type: string
+      value:
+        $ref: '#/definitions/models.MetaValue'
+    type: object
+  models.MetaContact:
+    properties:
+      profile:
+        $ref: '#/definitions/models.MetaProfile'
+      wa_id:
+        type: string
+    type: object
+  models.MetaEntry:
+    properties:
+      changes:
+        items:
+          $ref: '#/definitions/models.MetaChange'
+        type: array
+      id:
+        type: string
+    type: object
+  models.MetaMessage:
+    properties:
+      from:
+        type: string
+      id:
+        type: string
+      text:
+        $ref: '#/definitions/models.MetaTextBody'
+      timestamp:
+        type: string
+      type:
+        type: string
+    type: object
+  models.MetaMetadata:
+    properties:
+      display_phone_number:
+        type: string
+      phone_number_id:
+        type: string
+    type: object
+  models.MetaProfile:
+    properties:
+      name:
+        type: string
+    type: object
+  models.MetaTextBody:
+    properties:
+      body:
+        type: string
+    type: object
+  models.MetaValue:
+    properties:
+      contacts:
+        items:
+          $ref: '#/definitions/models.MetaContact'
+        type: array
+      messages:
+        items:
+          $ref: '#/definitions/models.MetaMessage'
+        type: array
+      messaging_product:
+        type: string
+      metadata:
+        $ref: '#/definitions/models.MetaMetadata'
+    type: object
+  models.MetaWebhookPayload:
+    properties:
+      entry:
+        items:
+          $ref: '#/definitions/models.MetaEntry'
+        type: array
+      object:
+        type: string
+    type: object
+  models.WatsonXDirectResponse:
+    properties:
+      reply:
+        example: Olá! Como posso ajudar?
+        type: string
+      session_id:
+        example: abc123
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API que intermedia a comunicação entre WhatsApp (via NeoHub) e WatsonX
+    Assistant.
+  title: WhatsApp WatsonX API
+  version: "1.0"
+paths:
+  /watsonx/message:
+    post:
+      consumes:
+      - application/json
+      description: Sends a text message to WatsonX Assistant and returns the response
+        (bypasses WhatsApp flow)
+      parameters:
+      - description: Message payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.DirectWatsonXRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.WatsonXDirectResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Send message directly to WatsonX
+      tags:
+      - watsonx
+  /watsonx/session:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new session with Watson Assistant and returns the session
+        ID
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.CreateSessionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Create a new Watson session
+      tags:
+      - watsonx
+  /watsonx/sessions/reset:
+    delete:
+      description: Deletes all cached Watson sessions from Redis
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Reset all sessions
+      tags:
+      - watsonx
+  /watsonx/sessions/stats:
+    get:
+      description: Returns information about cached sessions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get session cache statistics
+      tags:
+      - watsonx
+  /webhook/meta:
+    post:
+      consumes:
+      - application/json
+      description: Receives messages from Meta WhatsApp Business API, processes through
+        Watson, and sends reply back
+      parameters:
+      - description: Meta webhook payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.MetaWebhookPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Webhook for Meta WhatsApp Business API
+      tags:
+      - webhook
+  /whatsapp/send:
+    post:
+      consumes:
+      - application/json
+      description: Sends a text message to a WhatsApp number via NeoHub broker (bypasses
+        WatsonX flow)
+      parameters:
+      - description: Message payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.DirectWhatsAppRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Send message directly to WhatsApp
+      tags:
+      - whatsapp
+swagger: "2.0"
