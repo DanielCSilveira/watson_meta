@@ -44,23 +44,21 @@ func (s *MetaService) ProcessAndReply(payload *models.MetaWebhookPayload) error 
 		return fmt.Errorf("failed to send message to Watson: %w", err)
 	}
 
-	// Extract response text from Watson
-	replyText := extractResponseText(watsonResp)
+	log.Printf("\n✅ Watson Response received")
 
-	log.Printf("\n✅ Watson Response: %s", replyText)
+	// Build message from Watson response (can be text or interactive)
+	msg, replyText, shouldContinue := s.buildMessageFromWatson(watsonResp, clientID)
 
-	// Check if response contains [[CONTINUE]] tag
-	shouldContinue := strings.HasSuffix(strings.TrimSpace(replyText), "[[CONTINUE]]")
-
-	// Remove [[CONTINUE]] tag from message before sending
-	if shouldContinue {
-		replyText = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(replyText), "[[CONTINUE]]"))
-		log.Printf("🔄 [[CONTINUE]] tag detected - will fetch next message after sending this one")
+	log.Printf("📝 Reply type: %s", msg.Type)
+	if msg.Type == "text" {
+		log.Printf("💬 Text: %s", replyText)
+	} else {
+		log.Printf("🔘 Interactive message with options")
 	}
 
 	// Send reply back via NeoHub
 	log.Printf("\n📨 Sending reply to client %s via NeoHub...", clientID)
-	if err := s.neohub.SendMessage(clientID, replyText); err != nil {
+	if err := s.neohub.SendStructuredMessage(msg); err != nil {
 		return fmt.Errorf("failed to send reply via NeoHub to %s: %w", clientID, err)
 	}
 
@@ -98,22 +96,21 @@ func (s *MetaService) processContinuation(clientID string) {
 		return
 	}
 
-	// Extract response text from Watson
-	replyText := extractResponseText(watsonResp)
-	log.Printf("✅ Watson Continuation Response: %s", replyText)
+	log.Printf("✅ Watson Continuation Response received")
 
-	// Check if this response also has [[CONTINUE]] tag (recursive continuation)
-	shouldContinue := strings.HasSuffix(strings.TrimSpace(replyText), "[[CONTINUE]]")
+	// Build message from Watson response
+	msg, replyText, shouldContinue := s.buildMessageFromWatson(watsonResp, clientID)
 
-	// Remove [[CONTINUE]] tag from message before sending
-	if shouldContinue {
-		replyText = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(replyText), "[[CONTINUE]]"))
-		log.Printf("🔄 Another [[CONTINUE]] tag detected in continuation response")
+	log.Printf("📝 Reply type: %s", msg.Type)
+	if msg.Type == "text" {
+		log.Printf("💬 Text: %s", replyText)
+	} else {
+		log.Printf("🔘 Interactive message with options")
 	}
 
 	// Send continuation reply to client
 	log.Printf("📨 Sending continuation reply to client %s...", clientID)
-	if err := s.neohub.SendMessage(clientID, replyText); err != nil {
+	if err := s.neohub.SendStructuredMessage(msg); err != nil {
 		log.Printf("❌ Error sending continuation reply: %v", err)
 		return
 	}
@@ -194,6 +191,151 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 	log.Printf("=== Extraction complete ===")
 
 	return text, clientID, nil
+}
+
+// buildMessageFromWatson constructs a WhatsApp message from Watson response
+// Returns the message, reply text, and whether continuation is needed
+func (s *MetaService) buildMessageFromWatson(resp *models.WatsonMessageResponse, clientID string) (*models.OutgoingMessage, string, bool) {
+	var textResponse string
+	var optionResponse *models.WatsonGeneric
+	shouldContinue := false
+
+	// First pass: find text and option responses
+	for i := range resp.Output.Generic {
+		g := &resp.Output.Generic[i]
+		
+		if g.ResponseType == "text" && g.Text != "" {
+			textResponse = g.Text
+			
+			// Check for [[CONTINUE]] tag in text
+			if strings.HasSuffix(strings.TrimSpace(g.Text), "[[CONTINUE]]") {
+				shouldContinue = true
+				textResponse = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(g.Text), "[[CONTINUE]]"))
+			}
+		} else if g.ResponseType == "option" && len(g.Options) > 0 {
+			optionResponse = g
+		}
+	}
+
+	// If no text response found, use default
+	if textResponse == "" {
+		textResponse = "Desculpe, não consegui processar sua mensagem."
+	}
+
+	// Build base message structure
+	msg := &models.OutgoingMessage{
+		MessagingProduct: "whatsapp",
+		RecipientType:    "individual",
+		To:               clientID,
+	}
+
+	// If there are options, create interactive message
+	if optionResponse != nil && len(optionResponse.Options) > 0 {
+		log.Printf("🔘 Found %d options from Watson", len(optionResponse.Options))
+		
+		// Use button type for <= 3 options, list for more
+		if len(optionResponse.Options) <= 3 {
+			msg.Type = "interactive"
+			msg.Interactive = s.buildButtonMessage(textResponse, optionResponse)
+		} else {
+			msg.Type = "interactive"
+			msg.Interactive = s.buildListMessage(textResponse, optionResponse)
+		}
+	} else {
+		// Simple text message
+		msg.Type = "text"
+		msg.Text = &models.MessageText{
+			Body: textResponse,
+		}
+	}
+
+	return msg, textResponse, shouldContinue
+}
+
+// buildButtonMessage creates a button-type interactive message (max 3 buttons)
+func (s *MetaService) buildButtonMessage(bodyText string, optionResp *models.WatsonGeneric) *models.InteractiveMessage {
+	buttons := make([]models.InteractiveButton, 0, len(optionResp.Options))
+	
+	for i, opt := range optionResp.Options {
+		if i >= 3 {
+			break // WhatsApp allows max 3 buttons
+		}
+		
+		buttons = append(buttons, models.InteractiveButton{
+			Type: "reply",
+			Reply: models.InteractiveButtonReply{
+				ID:    fmt.Sprintf("opt_%d", i),
+				Title: truncateText(opt.Label, 20), // WhatsApp button title max 20 chars
+			},
+		})
+	}
+	
+	header := optionResp.Title
+	if header == "" {
+		header = "Escolha uma opção"
+	}
+	
+	return &models.InteractiveMessage{
+		Type: "button",
+		Body: models.InteractiveBody{
+			Text: bodyText,
+		},
+		Action: models.InteractiveAction{
+			Buttons: buttons,
+		},
+	}
+}
+
+// buildListMessage creates a list-type interactive message (4-10 options)
+func (s *MetaService) buildListMessage(bodyText string, optionResp *models.WatsonGeneric) *models.InteractiveMessage {
+	rows := make([]models.InteractiveRow, 0, len(optionResp.Options))
+	
+	for i, opt := range optionResp.Options {
+		if i >= 10 {
+			break // WhatsApp allows max 10 list items
+		}
+		
+		rows = append(rows, models.InteractiveRow{
+			ID:          fmt.Sprintf("opt_%d", i),
+			Title:       truncateText(opt.Label, 24), // WhatsApp row title max 24 chars
+			Description: truncateText(optionResp.Description, 72), // Max 72 chars
+		})
+	}
+	
+	header := optionResp.Title
+	if header == "" {
+		header = "Escolha uma opção"
+	}
+	
+	buttonText := "Ver opções"
+	
+	return &models.InteractiveMessage{
+		Type: "list",
+		Header: &models.InteractiveHeader{
+			Type: "text",
+			Text: header,
+		},
+		Body: models.InteractiveBody{
+			Text: bodyText,
+		},
+		Action: models.InteractiveAction{
+			Button: buttonText,
+			Sections: []models.InteractiveSection{
+				{
+					Title: "Opções",
+					Rows:  rows,
+				},
+			},
+		},
+	}
+}
+
+// truncateText truncates text to max length
+func truncateText(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+	return text[:maxLen-3] + "..."
 }
 
 // extractResponseText extracts text from Watson response

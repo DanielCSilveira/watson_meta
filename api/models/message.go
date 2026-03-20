@@ -12,16 +12,66 @@ type IncomingMessage struct {
 
 // OutgoingMessage represents a message to be sent via NeoHub
 type OutgoingMessage struct {
-	MessagingProduct string      `json:"messaging_product"`
-	RecipientType    string      `json:"recipient_type"`
-	To               string      `json:"to"`
-	Type             string      `json:"type"`
-	Text             MessageText `json:"text"`
+	MessagingProduct string               `json:"messaging_product"`
+	RecipientType    string               `json:"recipient_type"`
+	To               string               `json:"to"`
+	Type             string               `json:"type"`
+	Text             *MessageText         `json:"text,omitempty"`
+	Interactive      *InteractiveMessage  `json:"interactive,omitempty"`
 }
 
 // MessageText represents the text content of a WhatsApp message
 type MessageText struct {
 	Body string `json:"body"`
+}
+
+// InteractiveMessage represents an interactive message (buttons or list)
+type InteractiveMessage struct {
+	Type   string          `json:"type"` // "button" or "list"
+	Header *InteractiveHeader `json:"header,omitempty"`
+	Body   InteractiveBody `json:"body"`
+	Footer *InteractiveFooter `json:"footer,omitempty"`
+	Action InteractiveAction `json:"action"`
+}
+
+type InteractiveHeader struct {
+	Type string `json:"type"` // "text"
+	Text string `json:"text"`
+}
+
+type InteractiveBody struct {
+	Text string `json:"text"`
+}
+
+type InteractiveFooter struct {
+	Text string `json:"text"`
+}
+
+type InteractiveAction struct {
+	Button   string               `json:"button,omitempty"`   // For list type
+	Buttons  []InteractiveButton  `json:"buttons,omitempty"`  // For button type (max 3)
+	Sections []InteractiveSection `json:"sections,omitempty"` // For list type
+}
+
+type InteractiveButton struct {
+	Type  string               `json:"type"`  // "reply"
+	Reply InteractiveButtonReply `json:"reply"`
+}
+
+type InteractiveButtonReply struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+type InteractiveSection struct {
+	Title string              `json:"title,omitempty"`
+	Rows  []InteractiveRow    `json:"rows"`
+}
+
+type InteractiveRow struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
 }
 
 // --- Watson Assistant v2 ---
@@ -58,8 +108,24 @@ type WatsonOutput struct {
 }
 
 type WatsonGeneric struct {
-	ResponseType string `json:"response_type"`
-	Text         string `json:"text"`
+	ResponseType string         `json:"response_type"`
+	Text         string         `json:"text,omitempty"`
+	Title        string         `json:"title,omitempty"`
+	Description  string         `json:"description,omitempty"`
+	Options      []WatsonOption `json:"options,omitempty"`
+}
+
+type WatsonOption struct {
+	Label string               `json:"label"`
+	Value WatsonOptionValue    `json:"value"`
+}
+
+type WatsonOptionValue struct {
+	Input WatsonOptionInput `json:"input,omitempty"`
+}
+
+type WatsonOptionInput struct {
+	Text string `json:"text,omitempty"`
 }
 
 type WatsonIntent struct {
@@ -146,12 +212,12 @@ type MetaValue struct {
 }
 
 type MetaStatus struct {
-	ID          string                 `json:"id"`
-	Status      string                 `json:"status"`
-	Timestamp   string                 `json:"timestamp"`
-	RecipientID string                 `json:"recipient_id"`
+	ID           string                 `json:"id"`
+	Status       string                 `json:"status"`
+	Timestamp    string                 `json:"timestamp"`
+	RecipientID  string                 `json:"recipient_id"`
 	Conversation map[string]interface{} `json:"conversation,omitempty"`
-	Pricing     map[string]interface{} `json:"pricing,omitempty"`
+	Pricing      map[string]interface{} `json:"pricing,omitempty"`
 }
 
 type MetaMetadata struct {

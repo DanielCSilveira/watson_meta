@@ -33,11 +33,16 @@ func (s *NeoHubService) SendMessage(to, body string) error {
 		RecipientType:    "individual",
 		To:               to,
 		Type:             "text",
-		Text: models.MessageText{
+		Text: &models.MessageText{
 			Body: body,
 		},
 	}
+	
+	return s.SendStructuredMessage(&msg)
+}
 
+// SendStructuredMessage sends a structured message (can be text or interactive) via NeoHub
+func (s *NeoHubService) SendStructuredMessage(msg *models.OutgoingMessage) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
