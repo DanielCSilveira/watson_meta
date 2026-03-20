@@ -58,6 +58,13 @@ func (h *WebhookHandler) HandleMetaWebhook(w http.ResponseWriter, r *http.Reques
 
 	// Process webhook and send reply (all logic in service)
 	if err := h.meta.ProcessAndReply(&payload); err != nil {
+		// If it's a status update, just ignore it (don't return error)
+		if err.Error() == "failed to extract message data: IGNORE_STATUS_UPDATE" {
+			log.Printf("ℹ️  Status update webhook - returning 200 OK")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(models.APIResponse{Status: "ok", Message: "status update ignored"})
+			return
+		}
 		log.Printf("❌ Error processing Meta webhook: %v", err)
 		http.Error(w, "failed to process webhook", http.StatusInternalServerError)
 		return

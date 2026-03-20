@@ -162,6 +162,12 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 	clientID = contact.WaID
 	log.Printf("📱 CLIENTE/DESTINATÁRIO: %s (Nome: %s)", clientID, contact.Profile.Name)
 
+	// Check if this is a status update (not a message)
+	if len(value.Statuses) > 0 && len(value.Messages) == 0 {
+		log.Printf("⏭️  Status update detected (read/delivered/sent) - ignoring")
+		return "", "", fmt.Errorf("IGNORE_STATUS_UPDATE")
+	}
+
 	// Extract text from messages
 	log.Printf("Number of messages: %d", len(value.Messages))
 	if len(value.Messages) == 0 {

@@ -140,8 +140,18 @@ type MetaChange struct {
 type MetaValue struct {
 	MessagingProduct string        `json:"messaging_product"`
 	Metadata         MetaMetadata  `json:"metadata"`
-	Contacts         []MetaContact `json:"contacts"`
-	Messages         []MetaMessage `json:"messages"`
+	Contacts         []MetaContact `json:"contacts,omitempty"`
+	Messages         []MetaMessage `json:"messages,omitempty"`
+	Statuses         []MetaStatus  `json:"statuses,omitempty"`
+}
+
+type MetaStatus struct {
+	ID          string                 `json:"id"`
+	Status      string                 `json:"status"`
+	Timestamp   string                 `json:"timestamp"`
+	RecipientID string                 `json:"recipient_id"`
+	Conversation map[string]interface{} `json:"conversation,omitempty"`
+	Pricing     map[string]interface{} `json:"pricing,omitempty"`
 }
 
 type MetaMetadata struct {
