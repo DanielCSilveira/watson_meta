@@ -235,13 +235,13 @@ type MetaProfile struct {
 }
 
 type MetaMessage struct {
-	From        string                  `json:"from"`
-	ID          string                  `json:"id"`
-	Timestamp   string                  `json:"timestamp"`
-	Type        string                  `json:"type"`
-	Text        *MetaTextBody           `json:"text,omitempty"`
-	Interactive *MetaInteractiveReply   `json:"interactive,omitempty"`
-	Button      *MetaButtonReply        `json:"button,omitempty"`
+	From        string                `json:"from"`
+	ID          string                `json:"id"`
+	Timestamp   string                `json:"timestamp"`
+	Type        string                `json:"type"`
+	Text        *MetaTextBody         `json:"text,omitempty"`
+	Interactive *MetaInteractiveReply `json:"interactive,omitempty"`
+	Button      *MetaButtonReply      `json:"button,omitempty"`
 }
 
 type MetaTextBody struct {

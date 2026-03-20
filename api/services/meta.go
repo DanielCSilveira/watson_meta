@@ -184,7 +184,7 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 			text = message.Text.Body
 			log.Printf("💬 TEXT MESSAGE: '%s'", text)
 		}
-	
+
 	case "interactive":
 		// User clicked on button or selected from list
 		if message.Interactive != nil {
@@ -196,14 +196,14 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 				log.Printf("📋 LIST ITEM SELECTED: '%s' (ID: %s)", text, message.Interactive.ListReply.ID)
 			}
 		}
-	
+
 	case "button":
 		// Legacy button format (deprecated but still possible)
 		if message.Button != nil {
 			text = message.Button.Text
 			log.Printf("🔘 LEGACY BUTTON CLICKED: '%s'", text)
 		}
-	
+
 	default:
 		log.Printf("⚠️  Unsupported message type: %s", message.Type)
 		return "", "", fmt.Errorf("message type not supported: %s", message.Type)
