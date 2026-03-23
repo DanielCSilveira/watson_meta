@@ -39,35 +39,42 @@ func (s *MetaService) ProcessAndReply(payload *models.MetaWebhookPayload) error 
 	log.Printf("   Message: %s", text)
 
 	// Send message to Watson
-	watsonResp, _, err := s.watsonx.SendMessage(text, "", clientID)
+	watsonResp, sessionID, err := s.watsonx.SendMessage(text, "", clientID)
 	if err != nil {
 		return fmt.Errorf("failed to send message to Watson: %w", err)
 	}
 
 	log.Printf("\n✅ Watson Response received")
+	log.Printf("   Session ID: %s", sessionID)
 
-	// Build message from Watson response (can be text or interactive)
-	msg, replyText, shouldContinue := s.buildMessageFromWatson(watsonResp, clientID)
+	// Build messages from Watson response (can be multiple text messages and/or interactive)
+	msgs, shouldContinue := s.buildMessagesFromWatson(watsonResp, clientID)
 
-	log.Printf("📝 Reply type: %s", msg.Type)
-	if msg.Type == "text" {
-		log.Printf("💬 Text: %s", replyText)
-	} else {
-		log.Printf("🔘 Interactive message with options")
+	log.Printf("📝 Watson returned %d message(s)", len(msgs))
+
+	// Send each message back via NeoHub
+	for i, msg := range msgs {
+		log.Printf("\n📨 Sending message %d/%d to client %s via NeoHub...", i+1, len(msgs), clientID)
+		log.Printf("   Type: %s", msg.Type)
+
+		if err := s.neohub.SendStructuredMessage(msg); err != nil {
+			return fmt.Errorf("failed to send message %d via NeoHub to %s: %w", i+1, clientID, err)
+		}
+
+		log.Printf("✅ Message %d/%d sent successfully", i+1, len(msgs))
+
+		// Small delay between multiple messages for better UX
+		if i < len(msgs)-1 {
+			time.Sleep(500 * time.Millisecond)
+		}
 	}
 
-	// Send reply back via NeoHub
-	log.Printf("\n📨 Sending reply to client %s via NeoHub...", clientID)
-	if err := s.neohub.SendStructuredMessage(msg); err != nil {
-		return fmt.Errorf("failed to send reply via NeoHub to %s: %w", clientID, err)
-	}
-
-	log.Printf("✅ Successfully sent reply to client %s", clientID)
+	log.Printf("✅ All messages sent to client %s", clientID)
 
 	// If [[CONTINUE]] tag was present, fetch next response asynchronously
 	if shouldContinue {
 		log.Printf("⏳ Scheduling continuation call in 3 seconds...")
-		go s.processContinuation(clientID)
+		go s.processContinuation(clientID, sessionID)
 	}
 
 	log.Printf("========================================\n")
@@ -76,7 +83,7 @@ func (s *MetaService) ProcessAndReply(payload *models.MetaWebhookPayload) error 
 }
 
 // processContinuation handles continuation of Watson responses
-func (s *MetaService) processContinuation(clientID string) {
+func (s *MetaService) processContinuation(clientID, sessionID string) {
 	log.Printf("\n========================================")
 	log.Printf("🔄 Processing Continuation for client %s", clientID)
 	log.Printf("========================================")
@@ -87,10 +94,11 @@ func (s *MetaService) processContinuation(clientID string) {
 
 	log.Printf("📤 Sending continuation request to Watson (empty message)...")
 	log.Printf("   Client ID: %s", clientID)
+	log.Printf("   Session ID: %s", sessionID)
 	log.Printf("   Message: \"\" (empty - continuation)")
 
-	// Send empty message to Watson to get next response
-	watsonResp, _, err := s.watsonx.SendMessage("", "", clientID)
+	// Send empty message to Watson to get next response using the same session
+	watsonResp, _, err := s.watsonx.SendMessage("", sessionID, clientID)
 	if err != nil {
 		log.Printf("❌ Error in continuation call to Watson: %v", err)
 		return
@@ -98,29 +106,35 @@ func (s *MetaService) processContinuation(clientID string) {
 
 	log.Printf("✅ Watson Continuation Response received")
 
-	// Build message from Watson response
-	msg, replyText, shouldContinue := s.buildMessageFromWatson(watsonResp, clientID)
+	// Build messages from Watson response
+	msgs, shouldContinue := s.buildMessagesFromWatson(watsonResp, clientID)
 
-	log.Printf("📝 Reply type: %s", msg.Type)
-	if msg.Type == "text" {
-		log.Printf("💬 Text: %s", replyText)
-	} else {
-		log.Printf("🔘 Interactive message with options")
+	log.Printf("📝 Continuation returned %d message(s)", len(msgs))
+
+	// Send each continuation message to client
+	for i, msg := range msgs {
+		log.Printf("📨 Sending continuation message %d/%d to client %s...", i+1, len(msgs), clientID)
+		log.Printf("   Type: %s", msg.Type)
+
+		if err := s.neohub.SendStructuredMessage(msg); err != nil {
+			log.Printf("❌ Error sending continuation message %d: %v", i+1, err)
+			return
+		}
+
+		log.Printf("✅ Continuation message %d/%d sent successfully", i+1, len(msgs))
+
+		// Small delay between multiple messages
+		if i < len(msgs)-1 {
+			time.Sleep(500 * time.Millisecond)
+		}
 	}
 
-	// Send continuation reply to client
-	log.Printf("📨 Sending continuation reply to client %s...", clientID)
-	if err := s.neohub.SendStructuredMessage(msg); err != nil {
-		log.Printf("❌ Error sending continuation reply: %v", err)
-		return
-	}
-
-	log.Printf("✅ Successfully sent continuation reply to client %s", clientID)
+	log.Printf("✅ All continuation messages sent to client %s", clientID)
 
 	// If another [[CONTINUE]] tag was present, continue the chain
 	if shouldContinue {
 		log.Printf("🔄 Chaining another continuation...")
-		go s.processContinuation(clientID)
+		go s.processContinuation(clientID, sessionID)
 	}
 
 	log.Printf("========================================\n")
@@ -218,63 +232,90 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 	return text, clientID, nil
 }
 
-// buildMessageFromWatson constructs a WhatsApp message from Watson response
-// Returns the message, reply text, and whether continuation is needed
-func (s *MetaService) buildMessageFromWatson(resp *models.WatsonMessageResponse, clientID string) (*models.OutgoingMessage, string, bool) {
-	var textResponse string
+// buildMessagesFromWatson constructs WhatsApp messages from Watson response
+// Returns array of messages and whether continuation is needed
+// Processes all text responses in the generic array as separate messages
+func (s *MetaService) buildMessagesFromWatson(resp *models.WatsonMessageResponse, clientID string) ([]*models.OutgoingMessage, bool) {
+	var messages []*models.OutgoingMessage
 	var optionResponse *models.WatsonGeneric
 	shouldContinue := false
 
-	// First pass: find text and option responses
+	// Process each item in generic array
 	for i := range resp.Output.Generic {
 		g := &resp.Output.Generic[i]
 
 		if g.ResponseType == "text" && g.Text != "" {
-			textResponse = g.Text
+			textResponse := g.Text
 
 			// Check for [[CONTINUE]] tag in text
 			if strings.HasSuffix(strings.TrimSpace(g.Text), "[[CONTINUE]]") {
 				shouldContinue = true
 				textResponse = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(g.Text), "[[CONTINUE]]"))
 			}
+
+			// Create a text message for each text response
+			msg := &models.OutgoingMessage{
+				MessagingProduct: "whatsapp",
+				RecipientType:    "individual",
+				To:               clientID,
+				Type:             "text",
+				Text: &models.MessageText{
+					Body: textResponse,
+				},
+			}
+			messages = append(messages, msg)
+			log.Printf("💬 Text message %d: %s", len(messages), truncateText(textResponse, 50))
+
 		} else if g.ResponseType == "option" && len(g.Options) > 0 {
 			optionResponse = g
 		}
 	}
 
-	// If no text response found, use default
-	if textResponse == "" {
-		textResponse = "Desculpe, não consegui processar sua mensagem."
-	}
-
-	// Build base message structure
-	msg := &models.OutgoingMessage{
-		MessagingProduct: "whatsapp",
-		RecipientType:    "individual",
-		To:               clientID,
-	}
-
 	// If there are options, create interactive message
+	// Options are added as a final message after all text messages
 	if optionResponse != nil && len(optionResponse.Options) > 0 {
 		log.Printf("🔘 Found %d options from Watson", len(optionResponse.Options))
 
+		// Get the last text message to use as body for interactive message
+		bodyText := "Escolha uma opção:"
+		if len(messages) > 0 && messages[len(messages)-1].Text != nil {
+			// Use last text message as body and remove it from separate messages
+			bodyText = messages[len(messages)-1].Text.Body
+			messages = messages[:len(messages)-1]
+		}
+
+		msg := &models.OutgoingMessage{
+			MessagingProduct: "whatsapp",
+			RecipientType:    "individual",
+			To:               clientID,
+			Type:             "interactive",
+		}
+
 		// Use button type for <= 3 options, list for more
 		if len(optionResponse.Options) <= 3 {
-			msg.Type = "interactive"
-			msg.Interactive = s.buildButtonMessage(textResponse, optionResponse)
+			msg.Interactive = s.buildButtonMessage(bodyText, optionResponse)
 		} else {
-			msg.Type = "interactive"
-			msg.Interactive = s.buildListMessage(textResponse, optionResponse)
+			msg.Interactive = s.buildListMessage(bodyText, optionResponse)
 		}
-	} else {
-		// Simple text message
-		msg.Type = "text"
-		msg.Text = &models.MessageText{
-			Body: textResponse,
-		}
+
+		messages = append(messages, msg)
 	}
 
-	return msg, textResponse, shouldContinue
+	// If no messages were created, return a default message
+	if len(messages) == 0 {
+		msg := &models.OutgoingMessage{
+			MessagingProduct: "whatsapp",
+			RecipientType:    "individual",
+			To:               clientID,
+			Type:             "text",
+			Text: &models.MessageText{
+				Body: "Desculpe, não consegui processar sua mensagem.",
+			},
+		}
+		messages = append(messages, msg)
+	}
+
+	return messages, shouldContinue
 }
 
 // buildButtonMessage creates a button-type interactive message (max 3 buttons)
