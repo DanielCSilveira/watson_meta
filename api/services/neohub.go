@@ -93,7 +93,13 @@ func (s *NeoHubService) MarkAsRead(messageID string) error {
 		return fmt.Errorf("failed to marshal read status: %w", err)
 	}
 
+	// Log payload being sent
+	var prettyPayload bytes.Buffer
+	json.Indent(&prettyPayload, payloadBytes, "", "  ")
+	fmt.Printf("📖 Marking as read - Sending to NeoHub:\n%s\n", prettyPayload.String())
+
 	sendURL := fmt.Sprintf("%s/v1/%s/messages", s.baseURL, s.wabaID)
+	fmt.Printf("URL: %s\n", sendURL)
 
 	req, err := http.NewRequest("POST", sendURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
