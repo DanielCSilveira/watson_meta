@@ -28,8 +28,8 @@ func (s *MetaService) ProcessAndReply(payload *models.MetaWebhookPayload) error 
 	log.Printf("🔔 Meta Webhook Received")
 	log.Printf("========================================")
 
-	// Extract text and client ID from payload
-	text, clientID, err := s.extractMessageData(payload)
+	// Extract text, client ID, and message ID from payload
+	text, clientID, messageID, err := s.extractMessageData(payload)
 	if err != nil {
 		return fmt.Errorf("failed to extract message data: %w", err)
 	}
@@ -42,6 +42,13 @@ func (s *MetaService) ProcessAndReply(payload *models.MetaWebhookPayload) error 
 	watsonResp, sessionID, err := s.watsonx.SendMessage(text, "", clientID)
 	if err != nil {
 		return fmt.Errorf("failed to send message to Watson: %w", err)
+	}
+
+	// Mark message as read on WhatsApp
+	log.Printf("\n👁️  Marking message as read on WhatsApp...")
+	if err := s.neohub.MarkAsRead(messageID); err != nil {
+		log.Printf("⚠️  Warning: Failed to mark message as read: %v", err)
+		// Don't fail the whole flow if marking as read fails
 	}
 
 	log.Printf("\n✅ Watson Response received")
@@ -140,14 +147,14 @@ func (s *MetaService) processContinuation(clientID, sessionID string) {
 	log.Printf("========================================\n")
 }
 
-// extractMessageData extracts the text and client ID from Meta webhook payload
-func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (text string, clientID string, err error) {
+// extractMessageData extracts the text, client ID, and message ID from Meta webhook payload
+func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (text string, clientID string, messageID string, err error) {
 	log.Printf("=== Extracting data from Meta webhook ===")
 	log.Printf("Payload Object: %s", payload.Object)
 	log.Printf("Number of entries: %d", len(payload.Entry))
 
 	if len(payload.Entry) == 0 {
-		return "", "", fmt.Errorf("no entries in payload")
+		return "", "", "", fmt.Errorf("no entries in payload")
 	}
 
 	entry := payload.Entry[0]
@@ -155,7 +162,7 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 	log.Printf("Number of changes: %d", len(entry.Changes))
 
 	if len(entry.Changes) == 0 {
-		return "", "", fmt.Errorf("no changes in entry")
+		return "", "", "", fmt.Errorf("no changes in entry")
 	}
 
 	change := entry.Changes[0]
@@ -166,7 +173,7 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 	// Extract client ID from contacts
 	log.Printf("Number of contacts: %d", len(value.Contacts))
 	if len(value.Contacts) == 0 {
-		return "", "", fmt.Errorf("no contacts in payload")
+		return "", "", "", fmt.Errorf("no contacts in payload")
 	}
 
 	contact := value.Contacts[0]
@@ -176,17 +183,18 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 	// Check if this is a status update (not a message)
 	if len(value.Statuses) > 0 && len(value.Messages) == 0 {
 		log.Printf("⏭️  Status update detected (read/delivered/sent) - ignoring")
-		return "", "", fmt.Errorf("IGNORE_STATUS_UPDATE")
+		return "", "", "", fmt.Errorf("IGNORE_STATUS_UPDATE")
 	}
 
 	// Extract text from messages
 	log.Printf("Number of messages: %d", len(value.Messages))
 	if len(value.Messages) == 0 {
-		return "", "", fmt.Errorf("no messages in payload")
+		return "", "", "", fmt.Errorf("no messages in payload")
 	}
 
 	message := value.Messages[0]
-	log.Printf("Message ID: %s", message.ID)
+	messageID = message.ID
+	log.Printf("Message ID: %s", messageID)
 	log.Printf("Message from: %s", message.From)
 	log.Printf("Message type: %s", message.Type)
 	log.Printf("Message timestamp: %s", message.Timestamp)
@@ -220,16 +228,16 @@ func (s *MetaService) extractMessageData(payload *models.MetaWebhookPayload) (te
 
 	default:
 		log.Printf("⚠️  Unsupported message type: %s", message.Type)
-		return "", "", fmt.Errorf("message type not supported: %s", message.Type)
+		return "", "", "", fmt.Errorf("message type not supported: %s", message.Type)
 	}
 
 	if text == "" {
-		return "", "", fmt.Errorf("empty message text")
+		return "", "", "", fmt.Errorf("empty message text")
 	}
 
 	log.Printf("=== Extraction complete ===")
 
-	return text, clientID, nil
+	return text, clientID, messageID, nil
 }
 
 // buildMessagesFromWatson constructs WhatsApp messages from Watson response

@@ -79,3 +79,42 @@ func (s *NeoHubService) SendStructuredMessage(msg *models.OutgoingMessage) error
 	fmt.Printf("NeoHub response status: %d\n", resp.StatusCode)
 	return nil
 }
+
+// MarkAsRead marks a message as read on WhatsApp
+func (s *NeoHubService) MarkAsRead(messageID string) error {
+	payload := map[string]interface{}{
+		"messaging_product": "whatsapp",
+		"status":            "read",
+		"message_id":        messageID,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal read status: %w", err)
+	}
+
+	sendURL := fmt.Sprintf("%s/v1/%s/messages", s.baseURL, s.wabaID)
+
+	req, err := http.NewRequest("POST", sendURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create read status request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send read status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body := new(bytes.Buffer)
+		body.ReadFrom(resp.Body)
+		return fmt.Errorf("mark as read failed with status %d: %s", resp.StatusCode, body.String())
+	}
+
+	fmt.Printf("✅ Message %s marked as read (status: %d)\n", messageID, resp.StatusCode)
+	return nil
+}
