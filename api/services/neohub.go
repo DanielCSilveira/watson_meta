@@ -82,6 +82,11 @@ func (s *NeoHubService) SendStructuredMessage(msg *models.OutgoingMessage) error
 
 // MarkAsRead marks a message as read on WhatsApp
 func (s *NeoHubService) MarkAsRead(messageID string) error {
+	fmt.Printf("\n========================================\n")
+	fmt.Printf("📖 MARK AS READ REQUEST\n")
+	fmt.Printf("========================================\n")
+	fmt.Printf("Message ID: %s\n", messageID)
+	
 	payload := map[string]interface{}{
 		"messaging_product": "whatsapp",
 		"status":            "read",
@@ -93,13 +98,13 @@ func (s *NeoHubService) MarkAsRead(messageID string) error {
 		return fmt.Errorf("failed to marshal read status: %w", err)
 	}
 
-	// Log payload being sent
+	// Log payload being sent with clear separation
 	var prettyPayload bytes.Buffer
 	json.Indent(&prettyPayload, payloadBytes, "", "  ")
-	fmt.Printf("📖 Marking as read - Sending to NeoHub:\n%s\n", prettyPayload.String())
+	fmt.Printf("\nPayload JSON:\n%s\n", prettyPayload.String())
 
 	sendURL := fmt.Sprintf("%s/v1/%s/messages", s.baseURL, s.wabaID)
-	fmt.Printf("URL: %s\n", sendURL)
+	fmt.Printf("\nURL: %s\n", sendURL)
 
 	req, err := http.NewRequest("POST", sendURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
